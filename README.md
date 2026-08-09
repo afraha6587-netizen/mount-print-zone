@@ -1,6 +1,8 @@
-# Mount Print Zone (MPZ) - Production Deployment Guide
+# Mount Print Zone (MPZ) - E-Commerce & Print Shop Management System
 
-A modern, high-performance, full-stack web application for **Mount Print Zone**, a commercial printing and packaging hub located in **Vasanth Nagar, Bengaluru (near Mount Carmel College)**.
+[![Deployed with Vercel](https://vercel.com/button)](https://mountprintzone.com)
+
+Precision Commercial Printing & Packaging solution built with Next.js 15, Prisma, and TailwindCSS. for **Mount Print Zone**, a commercial printing and packaging hub located in **Vasanth Nagar, Bengaluru (near Mount Carmel College)**.
 
 ---
 
