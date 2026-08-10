@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Calculator, ArrowRight, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Calculator, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface ServiceItem {
   id: string;
@@ -19,6 +19,15 @@ interface ServiceItem {
   }[];
 }
 
+const defaultFallbackServiceItem: ServiceItem = {
+  id: 'default-print',
+  name: 'Standard Document Printout',
+  basePrice: 2,
+  discountPercent: 0,
+  estimatedDelivery: 'Same Day Dispatch',
+  pricingRules: [],
+};
+
 export function PriceCalculator({
   services = [],
   gstRate = 18,
@@ -28,27 +37,25 @@ export function PriceCalculator({
   gstRate: number;
   deliveryCharge: number;
 }) {
-  const safeServices = services && services.length > 0 ? services : [
-    {
-      id: 'default-print',
-      name: 'Standard Document Printout',
-      basePrice: 2,
-      discountPercent: 0,
-      estimatedDelivery: 'Same Day Dispatch',
-      pricingRules: [],
-    }
-  ];
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const safeServices = Array.isArray(services) && services.length > 0 ? services : [defaultFallbackServiceItem];
 
   const [selectedServiceId, setSelectedServiceId] = React.useState<string>(safeServices[0]?.id || 'default-print');
   const [quantity, setQuantity] = React.useState<number>(100);
 
-  const selectedService = safeServices.find((s) => s.id === selectedServiceId) || safeServices[0];
+  const selectedService =
+    safeServices.find((s) => s?.id === selectedServiceId) || safeServices[0] || defaultFallbackServiceItem;
 
   // Calculate volume discount price
   let unitPrice = selectedService?.basePrice || 0;
   let discountPercent = selectedService?.discountPercent || 0;
 
-  if (selectedService?.pricingRules) {
+  if (selectedService?.pricingRules && Array.isArray(selectedService.pricingRules)) {
     for (const rule of selectedService.pricingRules) {
       if (quantity >= rule.minQuantity && quantity <= rule.maxQuantity) {
         unitPrice = rule.unitPrice;
@@ -63,6 +70,18 @@ export function PriceCalculator({
   const netSubtotal = subtotal - discountAmount;
   const gstAmount = (netSubtotal * gstRate) / 100;
   const grandTotal = netSubtotal + gstAmount + deliveryCharge;
+
+  if (!isMounted) {
+    return (
+      <div className="glass-panel p-8 rounded-3xl text-center space-y-4">
+        <div className="animate-pulse flex flex-col items-center gap-3">
+          <div className="w-12 h-12 bg-sky-500/20 rounded-full" />
+          <div className="h-6 w-48 bg-slate-300 dark:bg-slate-700 rounded" />
+          <div className="h-4 w-64 bg-slate-200 dark:bg-slate-800 rounded" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -84,8 +103,8 @@ export function PriceCalculator({
             className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none"
           >
             {safeServices.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} (Base ₹{s.basePrice})
+              <option key={s.id || 'opt-' + s.name} value={s.id}>
+                {s.name} (Base ₹{s.basePrice || 0})
               </option>
             ))}
           </select>
@@ -195,7 +214,7 @@ export function PriceCalculator({
           </div>
         </div>
 
-        <Link href={`/custom-order?serviceId=${selectedService.id}&quantity=${quantity}`}>
+        <Link href={`/custom-order?serviceId=${selectedService?.id || 'default-print'}&quantity=${quantity}`}>
           <Button size="lg" className="w-full gap-2 font-bold shadow-lg shadow-sky-500/25">
             Proceed with Order <ArrowRight className="w-4 h-4" />
           </Button>
