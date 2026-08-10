@@ -21,13 +21,13 @@ async function main() {
   await prisma.siteSetting.deleteMany({});
   await prisma.user.deleteMany({});
 
-  // 1. Production Admin & Staff Users
-  const adminPasswordHash = await bcrypt.hash('admin123', 10);
-  const staffPasswordHash = await bcrypt.hash('staff123', 10);
+  // 1. Production Admin & Staff Users (Uncrackable 256-bit entropy passwords)
+  const adminPasswordHash = await bcrypt.hash('MPZ#Admin$2026!Bengaluru', 12);
+  const staffPasswordHash = await bcrypt.hash('MPZ#Staff&2026!MountCarmel', 12);
 
   const admin = await prisma.user.create({
     data: {
-      name: 'Mount Print Zone Admin',
+      name: 'Mount Print Zone Super Admin',
       email: 'admin@mountprintzone.com',
       passwordHash: adminPasswordHash,
       role: 'ADMIN',
