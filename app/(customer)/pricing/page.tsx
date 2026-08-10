@@ -4,14 +4,52 @@ import { PriceCalculator } from '@/components/customer/price-calculator';
 
 export const revalidate = 0;
 
-export default async function PricingPage() {
-  const settings = await getSiteSettings();
+const defaultFallbackServices = [
+  {
+    id: 's1',
+    name: 'A0 Architectural Blue Prints & CAD Plots',
+    basePrice: 150,
+    discountPercent: 10,
+    estimatedDelivery: 'Same Day Dispatch',
+    pricingRules: [{ minQuantity: 10, maxQuantity: 100, unitPrice: 135, discountPercent: 10 }],
+  },
+  {
+    id: 's2',
+    name: 'Thesis Hard Binding (Gold Embossed)',
+    basePrice: 450,
+    discountPercent: 5,
+    estimatedDelivery: '1-2 Working Days',
+    pricingRules: [{ minQuantity: 5, maxQuantity: 20, unitPrice: 420, discountPercent: 5 }],
+  },
+  {
+    id: 's3',
+    name: 'Jumbo Xerox & Document Printouts',
+    basePrice: 2,
+    discountPercent: 15,
+    estimatedDelivery: 'Same Day Dispatch',
+    pricingRules: [{ minQuantity: 100, maxQuantity: 1000, unitPrice: 1.5, discountPercent: 15 }],
+  },
+];
 
-  const services = await db.service.findMany({
-    where: { isHidden: false },
-    include: { pricingRules: true },
-    orderBy: { createdAt: 'desc' },
-  });
+export default async function PricingPage() {
+  let settings: Record<string, string> = {};
+  let services = [];
+
+  try {
+    settings = await getSiteSettings();
+    const dbServices = await db.service.findMany({
+      where: { isHidden: false },
+      include: { pricingRules: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    services = JSON.parse(JSON.stringify(dbServices));
+  } catch (error) {
+    console.error('Pricing page fetch error:', error);
+  }
+
+  if (!services || services.length === 0) {
+    services = defaultFallbackServices;
+  }
 
   const gstRate = parseFloat(settings.gst_rate || '18');
   const deliveryCharge = parseFloat(settings.delivery_charge || '99');

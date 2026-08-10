@@ -20,18 +20,29 @@ interface ServiceItem {
 }
 
 export function PriceCalculator({
-  services,
-  gstRate,
-  deliveryCharge,
+  services = [],
+  gstRate = 18,
+  deliveryCharge = 99,
 }: {
   services: ServiceItem[];
   gstRate: number;
   deliveryCharge: number;
 }) {
-  const [selectedServiceId, setSelectedServiceId] = React.useState<string>(services[0]?.id || '');
+  const safeServices = services && services.length > 0 ? services : [
+    {
+      id: 'default-print',
+      name: 'Standard Document Printout',
+      basePrice: 2,
+      discountPercent: 0,
+      estimatedDelivery: 'Same Day Dispatch',
+      pricingRules: [],
+    }
+  ];
+
+  const [selectedServiceId, setSelectedServiceId] = React.useState<string>(safeServices[0]?.id || 'default-print');
   const [quantity, setQuantity] = React.useState<number>(100);
 
-  const selectedService = services.find((s) => s.id === selectedServiceId) || services[0];
+  const selectedService = safeServices.find((s) => s.id === selectedServiceId) || safeServices[0];
 
   // Calculate volume discount price
   let unitPrice = selectedService?.basePrice || 0;
