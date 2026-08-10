@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { db } from '@/lib/db';
+import { ensureFullStoreCatalogSeeded } from '@/lib/seed-catalog';
 import { Printer, Clock, ArrowRight, Search, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -11,6 +12,7 @@ interface ServicesPageProps {
 }
 
 export default async function ServicesPage({ searchParams }: ServicesPageProps) {
+  await ensureFullStoreCatalogSeeded();
   const { category, query } = await searchParams;
 
   const categories = await db.serviceCategory.findMany({

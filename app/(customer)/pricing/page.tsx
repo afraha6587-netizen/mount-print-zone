@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { getSiteSettings } from '@/lib/settings';
+import { ensureFullStoreCatalogSeeded } from '@/lib/seed-catalog';
 import { PriceCalculator } from '@/components/customer/price-calculator';
 
 export const revalidate = 0;
@@ -92,6 +93,7 @@ export default async function PricingPage() {
   let services = [];
 
   try {
+    await ensureFullStoreCatalogSeeded();
     settings = await getSiteSettings();
     const dbServices = await db.service.findMany({
       where: { isHidden: false },

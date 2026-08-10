@@ -1,9 +1,11 @@
 import { db } from '@/lib/db';
+import { ensureFullStoreCatalogSeeded } from '@/lib/seed-catalog';
 import { ServiceManagerView } from '@/components/admin/service-manager-view';
 
 export const revalidate = 0;
 
 export default async function AdminServicesPage() {
+  await ensureFullStoreCatalogSeeded();
   const [services, categories] = await Promise.all([
     db.service.findMany({
       include: { category: true },
