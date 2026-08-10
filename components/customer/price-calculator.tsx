@@ -83,7 +83,7 @@ export function PriceCalculator({
             onChange={(e) => setSelectedServiceId(e.target.value)}
             className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none"
           >
-            {services.map((s) => (
+            {safeServices.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name} (Base ₹{s.basePrice})
               </option>
