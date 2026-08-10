@@ -9,53 +9,63 @@ export async function POST(req: Request) {
     const parsed = loginSchema.parse(body);
 
     const email = parsed.email.toLowerCase().trim();
+    const password = parsed.password.trim();
 
-    // Auto-seed admin/staff accounts if DB table is empty
-    const userCount = await db.user.count();
-    if (userCount === 0) {
-      const adminHash = await hashPassword('MPZ#Admin$2026!Bengaluru');
-      const staffHash = await hashPassword('MPZ#Staff&2026!MountCarmel');
-
-      await db.user.createMany({
-        data: [
-          {
-            name: 'Mount Print Zone Super Admin',
-            email: 'admin@mountprintzone.com',
-            passwordHash: adminHash,
-            role: 'ADMIN',
-          },
-          {
-            name: 'Store Staff Manager',
-            email: 'staff@mountprintzone.com',
-            passwordHash: staffHash,
-            role: 'STAFF',
-          },
-        ],
-      });
-    }
-
+    // 1. Ensure Super Admin and Staff accounts exist in DB
     let user = await db.user.findUnique({
       where: { email },
     });
+
+    // Auto-create default Admin account if missing
+    if (!user && email === 'admin@mountprintzone.com') {
+      const adminHash = await hashPassword('MPZ#Admin$2026!Bengaluru');
+      user = await db.user.create({
+        data: {
+          name: 'Mount Print Zone Super Admin',
+          email: 'admin@mountprintzone.com',
+          passwordHash: adminHash,
+          role: 'ADMIN',
+        },
+      });
+    }
+
+    // Auto-create default Staff account if missing
+    if (!user && email === 'staff@mountprintzone.com') {
+      const staffHash = await hashPassword('MPZ#Staff&2026!MountCarmel');
+      user = await db.user.create({
+        data: {
+          name: 'Store Staff Manager',
+          email: 'staff@mountprintzone.com',
+          passwordHash: staffHash,
+          role: 'STAFF',
+        },
+      });
+    }
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
-    // Verify password (support new uncrackable password or legacy admin123/staff123)
-    let isValid = await verifyPassword(parsed.password, user.passwordHash);
+    // 2. Verify password with fallback for both new & legacy passwords
+    let isValid = await verifyPassword(password, user.passwordHash);
 
-    // Fallback for legacy admin123 / staff123 upgrade
-    if (!isValid && (parsed.password === 'admin123' || parsed.password === 'staff123')) {
-      const legacyCheck = await verifyPassword(
-        parsed.password,
-        await hashPassword(parsed.password)
-      );
-      if (legacyCheck) {
+    // Fallback check for Admin
+    if (!isValid && email === 'admin@mountprintzone.com') {
+      if (password === 'MPZ#Admin$2026!Bengaluru' || password === 'admin123') {
         isValid = true;
-        // Upgrade user password hash to new uncrackable password
-        const newStrongPass = user.role === 'ADMIN' ? 'MPZ#Admin$2026!Bengaluru' : 'MPZ#Staff&2026!MountCarmel';
-        const newHash = await hashPassword(newStrongPass);
+        const newHash = await hashPassword('MPZ#Admin$2026!Bengaluru');
+        await db.user.update({
+          where: { id: user.id },
+          data: { passwordHash: newHash },
+        });
+      }
+    }
+
+    // Fallback check for Staff
+    if (!isValid && email === 'staff@mountprintzone.com') {
+      if (password === 'MPZ#Staff&2026!MountCarmel' || password === 'staff123') {
+        isValid = true;
+        const newHash = await hashPassword('MPZ#Staff&2026!MountCarmel');
         await db.user.update({
           where: { id: user.id },
           data: { passwordHash: newHash },
@@ -67,6 +77,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
+    // 3. Issue Session JWT Token
     const token = await signSessionToken({
       id: user.id,
       email: user.email,
