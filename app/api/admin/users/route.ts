@@ -41,6 +41,30 @@ export async function POST(req: Request) {
   }
 }
 
+export async function PUT(req: Request) {
+  try {
+    await requireAdmin();
+
+    const body = await req.json();
+    const { id, password } = body;
+
+    if (!id || !password) {
+      return NextResponse.json({ error: 'User ID and new password are required' }, { status: 400 });
+    }
+
+    const passwordHash = await hashPassword(password);
+
+    await db.user.update({
+      where: { id },
+      data: { passwordHash },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to update password' }, { status: 400 });
+  }
+}
+
 export async function DELETE(req: Request) {
   try {
     await requireAdmin();

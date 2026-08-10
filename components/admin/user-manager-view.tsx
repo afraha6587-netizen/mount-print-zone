@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
-import { UserPlus, UserCheck, Trash2, Mail, Lock, User, Shield } from 'lucide-react';
+import { UserPlus, UserCheck, Trash2, Key, Shield } from 'lucide-react';
 
 interface UserAccount {
   id: string;
@@ -17,15 +17,22 @@ interface UserAccount {
 export function UserManagerView({ initialUsers }: { initialUsers: UserAccount[] }) {
   const router = useRouter();
   const [users, setUsers] = React.useState<UserAccount[]>(initialUsers);
-  const [isModalOpen, setIsModalOpen] = React.useState(false);
 
-  // Form states
+  // Register modal states
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [role, setRole] = React.useState<'ADMIN' | 'STAFF'>('STAFF');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState('');
+
+  // Password edit modal states
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = React.useState(false);
+  const [targetUserId, setTargetUserId] = React.useState<string | null>(null);
+  const [targetUserName, setTargetUserName] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [passwordSuccess, setPasswordSuccess] = React.useState(false);
 
   const handleRegisterUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +56,44 @@ export function UserManagerView({ initialUsers }: { initialUsers: UserAccount[] 
       router.refresh();
     } catch (err: any) {
       setError(err.message || 'Registration failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openPasswordModal = (user: UserAccount) => {
+    setTargetUserId(user.id);
+    setTargetUserName(user.name);
+    setNewPassword('');
+    setPasswordSuccess(false);
+    setError('');
+    setIsPasswordModalOpen(true);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetUserId || !newPassword) return;
+
+    setError('');
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: targetUserId, password: newPassword }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update password');
+
+      setPasswordSuccess(true);
+      setTimeout(() => {
+        setIsPasswordModalOpen(false);
+        setPasswordSuccess(false);
+      }, 1500);
+    } catch (err: any) {
+      setError(err.message || 'Password change failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -84,7 +129,7 @@ export function UserManagerView({ initialUsers }: { initialUsers: UserAccount[] 
                 <th className="p-4">Email</th>
                 <th className="p-4">Role</th>
                 <th className="p-4">Permissions</th>
-                <th className="p-4 text-right">Action</th>
+                <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
@@ -112,13 +157,22 @@ export function UserManagerView({ initialUsers }: { initialUsers: UserAccount[] 
                       : 'Staff Access (Order Updates, Customer Proofing, Service View)'}
                   </td>
                   <td className="p-4 text-right">
-                    <button
-                      onClick={() => handleDeleteUser(u.id)}
-                      className="p-1.5 rounded bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors"
-                      title="Delete User Account"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => openPasswordModal(u)}
+                        className="p-1.5 rounded bg-sky-500/10 text-sky-400 hover:bg-sky-500 hover:text-white transition-colors"
+                        title="Change Account Password"
+                      >
+                        <Key className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(u.id)}
+                        className="p-1.5 rounded bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors"
+                        title="Delete User Account"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -142,67 +196,103 @@ export function UserManagerView({ initialUsers }: { initialUsers: UserAccount[] 
           )}
 
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Full Name *
-            </label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Full Name *</label>
             <input
               type="text"
               required
-              placeholder="e.g. Rahul Verma"
+              placeholder="e.g. Mount Carmel Store Manager"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Work Email *
-            </label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Work Email *</label>
             <input
               type="email"
               required
-              placeholder="rahul@mountprintzone.com"
+              placeholder="Enter work email here"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Password *
-            </label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Password *</label>
             <input
               type="password"
               required
-              placeholder="Minimum 6 characters"
+              placeholder="Enter password here"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Account Role *
-            </label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Account Role *</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as 'ADMIN' | 'STAFF')}
-              className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none"
             >
-              <option value="STAFF">STAFF (Order Management & Service View)</option>
-              <option value="ADMIN">ADMIN (Full Access & Site Settings)</option>
+              <option value="STAFF">Staff (Order Management & Service Operations)</option>
+              <option value="ADMIN">Super Admin (Full Access to Settings, Pricing & Users)</option>
             </select>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
             <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
             <Button type="submit" isLoading={isSubmitting} className="font-bold">
-              Register User Account
+              Register Account
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+        maxWidth="md"
+        title={`Change Password for ${targetUserName}`}
+      >
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          {error && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold text-center">
+              {error}
+            </div>
+          )}
+
+          {passwordSuccess && (
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold text-center">
+              Password updated successfully!
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">New Password *</label>
+            <input
+              type="password"
+              required
+              minLength={6}
+              placeholder="Enter new password (min 6 characters)"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+            <Button type="button" variant="ghost" onClick={() => setIsPasswordModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" isLoading={isSubmitting} className="font-bold">
+              Update Password
             </Button>
           </div>
         </form>
