@@ -1,10 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
-import { Upload, FileText, CheckCircle2, ShieldCheck, Printer, ArrowRight } from 'lucide-react';
+import { Upload, CheckCircle2, ShieldCheck, Link2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface ServiceOption {
@@ -33,6 +33,7 @@ export function CustomOrderForm({
   const [paperSize, setPaperSize] = React.useState('A4');
   const [quantity, setQuantity] = React.useState(defaultQty);
   const [notes, setNotes] = React.useState('');
+  const [driveLink, setDriveLink] = React.useState('');
 
   const [file, setFile] = React.useState<File | null>(null);
   const [isUploading, setIsUploading] = React.useState(false);
@@ -46,14 +47,58 @@ export function CustomOrderForm({
     grandTotal: number;
   } | null>(null);
 
+  // Compress image if larger than 3.5MB to avoid Vercel 4.5MB Serverless Payload limits
+  const compressImageIfNeeded = async (imageFile: File): Promise<File> => {
+    if (imageFile.size < 3.5 * 1024 * 1024) return imageFile;
+    if (!imageFile.type.startsWith('image/')) return imageFile;
+
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(imageFile);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        const maxDim = 2400;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], imageFile.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(imageFile);
+            }
+          },
+          'image/jpeg',
+          0.85
+        );
+      };
+      img.onerror = () => resolve(imageFile);
+    });
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selected = e.target.files[0];
-      const maxBytes = parseInt(maxUploadMb, 10) * 1024 * 1024;
-      if (selected.size > maxBytes) {
-        setErrorMessage(`File exceeds maximum size limit of ${maxUploadMb}MB`);
-        return;
-      }
       setErrorMessage('');
       setFile(selected);
     }
@@ -68,18 +113,35 @@ export function CustomOrderForm({
       let fileUrl = '';
       let fileName = '';
 
-      // Upload file if selected
+      // 1. Upload File if attached
       if (file) {
         setIsUploading(true);
+
+        const uploadReadyFile = await compressImageIfNeeded(file);
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', uploadReadyFile);
 
         const uploadRes = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
         });
 
-        const uploadData = await uploadRes.json();
+        if (uploadRes.status === 413) {
+          throw new Error(
+            'Artwork file size is too large for direct upload (limit 4.5MB). Please attach a Google Drive / WeTransfer link in the Drive Link field below!'
+          );
+        }
+
+        const contentType = uploadRes.headers.get('content-type') || '';
+        let uploadData: any = {};
+
+        if (contentType.includes('application/json')) {
+          uploadData = await uploadRes.json();
+        } else {
+          const rawText = await uploadRes.text();
+          throw new Error(`Upload server error (${uploadRes.status}): ${rawText.substring(0, 120)}`);
+        }
+
         if (!uploadRes.ok) {
           throw new Error(uploadData.error || 'Failed to upload artwork file');
         }
@@ -89,7 +151,17 @@ export function CustomOrderForm({
         setIsUploading(false);
       }
 
-      // Create Order
+      // Combine Drive link with notes if provided
+      let finalNotes = `[Size: ${paperSize}] ${notes}`.trim();
+      if (driveLink.trim()) {
+        finalNotes += ` | [Artwork Cloud Link: ${driveLink.trim()}]`;
+        if (!fileUrl) {
+          fileUrl = driveLink.trim();
+          fileName = 'Cloud_Artwork_Link';
+        }
+      }
+
+      // 2. Create Order
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -99,13 +171,22 @@ export function CustomOrderForm({
           customerEmail,
           serviceId,
           quantity,
-          notes: `[Size: ${paperSize}] ${notes}`.trim(),
+          notes: finalNotes,
           designFileUrl: fileUrl,
           designFileName: fileName,
         }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      let data: any = {};
+
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const rawText = await res.text();
+        throw new Error(`Order server error (${res.status}): ${rawText.substring(0, 120)}`);
+      }
+
       if (!res.ok) {
         throw new Error(data.error || 'Failed to place order');
       }
@@ -121,9 +202,12 @@ export function CustomOrderForm({
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="glass-panel p-6 sm:p-10 rounded-3xl border border-slate-200/60 dark:border-slate-800/60 shadow-xl space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        className="glass-panel p-6 sm:p-10 rounded-3xl border border-slate-200/60 dark:border-slate-800/60 shadow-xl space-y-6"
+      >
         {errorMessage && (
-          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-sm font-semibold">
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-sm font-semibold leading-relaxed">
             {errorMessage}
           </div>
         )}
@@ -248,27 +332,43 @@ export function CustomOrderForm({
         </div>
 
         {/* Upload Design File */}
-        <div className="space-y-2">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-            Upload Design Artwork File
-          </label>
-          <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center hover:border-sky-500 transition-colors bg-slate-50/50 dark:bg-slate-900/50">
-            <input
-              type="file"
-              id="file-upload"
-              onChange={handleFileChange}
-              accept=".pdf,.ai,.psd,.cdr,.png,.jpg,.jpeg,.docx"
-              className="hidden"
-            />
-            <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-2">
-              <Upload className="w-8 h-8 text-sky-500 animate-bounce" />
-              <span className="text-sm font-bold text-slate-900 dark:text-white">
-                {file ? file.name : 'Click or Drag & Drop Design File'}
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                Accepted: {acceptedTypes} (Max: {maxUploadMb}MB)
-              </span>
+        <div className="space-y-4 pt-2 border-t border-slate-200 dark:border-slate-800">
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+              Attach Design File (PDF, AI, PSD, CDR, PNG, JPG, DOCX, DWG)
             </label>
+            <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center hover:border-sky-500 transition-colors bg-slate-50/50 dark:bg-slate-900/50">
+              <input
+                type="file"
+                id="file-upload"
+                onChange={handleFileChange}
+                accept=".pdf,.ai,.psd,.cdr,.png,.jpg,.jpeg,.docx,.dwg,.zip,.rar"
+                className="hidden"
+              />
+              <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                <Upload className="w-8 h-8 text-sky-500 animate-bounce" />
+                <span className="text-sm font-bold text-slate-900 dark:text-white">
+                  {file ? file.name : 'Click or Drag & Drop Design File'}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Direct Upload Limit: 4.5MB (Images auto-compressed). For larger files, paste a link below.
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* Cloud Drive Link for Large Files */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+              <Link2 className="w-3.5 h-3.5 text-sky-500" /> Or Paste Large File Link (Google Drive / WeTransfer / Dropbox)
+            </label>
+            <input
+              type="url"
+              placeholder="https://drive.google.com/file/d/..."
+              value={driveLink}
+              onChange={(e) => setDriveLink(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm"
+            />
           </div>
         </div>
 
