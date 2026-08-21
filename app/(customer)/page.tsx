@@ -18,40 +18,52 @@ import {
 import { ReviewModal } from '@/components/customer/review-modal';
 import { Button } from '@/components/ui/button';
 
-export const revalidate = 0;
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const settings = await getSiteSettings();
+  let settings: Record<string, string> = {};
+  let featuredServices: any[] = [];
+  let categories: any[] = [];
+  let portfolioItems: any[] = [];
+  let testimonials: any[] = [];
+  let offers: any[] = [];
+  let banners: any[] = [];
 
-  const [featuredServices, categories, portfolioItems, testimonials, offers, banners] =
-    await Promise.all([
-      db.service.findMany({
-        where: { isFeatured: true, isHidden: false },
-        include: { category: true },
-        take: 6,
-      }),
-      db.serviceCategory.findMany({
-        orderBy: { displayOrder: 'asc' },
-      }),
-      db.portfolioItem.findMany({
-        where: { isFeatured: true },
-        include: { category: true },
-        take: 4,
-      }),
-      db.testimonial.findMany({
-        where: { isFeatured: true },
-        take: 3,
-      }),
-      db.offer.findMany({
-        where: { isActive: true },
-        take: 2,
-      }),
-      db.banner.findMany({
-        where: { isActive: true },
-        orderBy: { order: 'asc' },
-        take: 2,
-      }),
-    ]);
+  try {
+    settings = await getSiteSettings();
+
+    [featuredServices, categories, portfolioItems, testimonials, offers, banners] =
+      await Promise.all([
+        db.service.findMany({
+          where: { isFeatured: true, isHidden: false },
+          include: { category: true },
+          take: 6,
+        }),
+        db.serviceCategory.findMany({
+          orderBy: { displayOrder: 'asc' },
+        }),
+        db.portfolioItem.findMany({
+          where: { isFeatured: true },
+          include: { category: true },
+          take: 4,
+        }),
+        db.testimonial.findMany({
+          where: { isFeatured: true },
+          take: 3,
+        }),
+        db.offer.findMany({
+          where: { isActive: true },
+          take: 2,
+        }),
+        db.banner.findMany({
+          where: { isActive: true },
+          orderBy: { order: 'asc' },
+          take: 2,
+        }),
+      ]);
+  } catch (err) {
+    console.error('HomePage fetch error fallback:', err);
+  }
 
   return (
     <div className="space-y-20 pb-20">

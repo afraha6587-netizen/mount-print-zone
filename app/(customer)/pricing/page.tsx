@@ -3,7 +3,7 @@ import { getSiteSettings } from '@/lib/settings';
 import { ensureFullStoreCatalogSeeded } from '@/lib/seed-catalog';
 import { PriceCalculator } from '@/components/customer/price-calculator';
 
-export const revalidate = 0;
+export const dynamic = 'force-dynamic';
 
 const defaultFallbackServices = [
   {
@@ -93,7 +93,6 @@ export default async function PricingPage() {
   let services = [];
 
   try {
-    await ensureFullStoreCatalogSeeded();
     settings = await getSiteSettings();
     const dbServices = await db.service.findMany({
       where: { isHidden: false },
@@ -101,6 +100,16 @@ export default async function PricingPage() {
       orderBy: { createdAt: 'desc' },
     });
     services = JSON.parse(JSON.stringify(dbServices));
+
+    if (services.length === 0) {
+      await ensureFullStoreCatalogSeeded();
+      const freshServices = await db.service.findMany({
+        where: { isHidden: false },
+        include: { pricingRules: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      services = JSON.parse(JSON.stringify(freshServices));
+    }
   } catch (error) {
     console.error('Pricing page fetch error:', error);
   }
