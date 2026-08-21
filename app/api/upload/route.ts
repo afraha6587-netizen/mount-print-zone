@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 import { uploadFile } from '@/lib/cloudinary';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
+
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+      return NextResponse.json({ error: 'No file selected for upload' }, { status: 400 });
     }
 
     const arrayBuffer = await file.arrayBuffer();
