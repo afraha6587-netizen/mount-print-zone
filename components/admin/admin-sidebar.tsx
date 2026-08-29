@@ -17,6 +17,7 @@ import {
   BarChart3,
   Printer,
   ChevronRight,
+  FileText,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -29,6 +30,7 @@ export function AdminSidebar({ userRole }: SidebarProps) {
   const navItems = [
     { href: '/admin/dashboard', label: 'Dashboard Overview', icon: LayoutDashboard },
     { href: '/admin/orders', label: 'Orders & Invoices', icon: ShoppingBag },
+    { href: '/admin/invoice-generator', label: 'Quick POS Invoice', icon: FileText },
     { href: '/admin/services', label: 'Services Catalog', icon: Layers },
     { href: '/admin/categories', label: 'Service Categories', icon: Tag },
     { href: '/admin/portfolio', label: 'Portfolio Showcase', icon: ImageIcon },
