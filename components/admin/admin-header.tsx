@@ -90,6 +90,13 @@ export function AdminHeader({ user }: { user: UserSession }) {
         <ThemeToggle />
 
         <a
+          href="/admin/invoice-generator"
+          className="p-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white transition-colors text-xs font-bold flex items-center gap-1.5 shadow-md shadow-sky-500/20"
+        >
+          ⚡ POS Billing
+        </a>
+
+        <a
           href="/"
           target="_blank"
           rel="noreferrer"
